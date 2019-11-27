@@ -97,7 +97,7 @@ model.add(Dense(1)) # a dense layer making the prediction
 model.compile(optimizer='adam', loss='mse')
 
 # LSTM expects data input to have the shape in the following format:  
-# `[batch, timesteps, features]`.  
+# `[batch, timesteps, features]`. The first argument is # of neurons. 
 
 # `batch`: # of samples.  
 # `timesteps`: # of lags plus one (one represents for the current value)  
@@ -164,10 +164,6 @@ for i in range(n_input):
     batch = np.append(batch[:,1:,:],[[pred_list[i]]],axis=1)
 # -
 
-from pandas.tseries.offsets import DateOffset
-add_dates = [df.index[-1] + DateOffset(months=x) for x in range(0,13) ]
-future_dates = pd.DataFrame(index=add_dates[1:],columns=df.columns)
-
 # +
 df_predict = pd.DataFrame(scaler.inverse_transform(pred_list),
                           index=future_dates[-n_input:].index, columns=['Prediction'])
@@ -187,9 +183,12 @@ plt.show()
 # `multivariate-one-step-TimeSeriesGenerator.py` and  
 # `multivariate-one-step-with-LSTM.py` for example. 
 
-# `multivariate-input-and-dependent-I.py`
-# `multivariate-input-and-dependent-II.py`
-# `multistep-forecasts.py`
+# `multivariate-input-and-dependent-I.py`  
+# `multivariate-input-and-dependent-II.py`  
+# `multistep-forecasts.py`  
+
+# # Reference
+
 
 
 
