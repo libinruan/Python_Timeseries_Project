@@ -14,6 +14,7 @@
 # ---
 
 # +
+import time
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -28,6 +29,14 @@ from keras.layers import LSTM
 from keras.layers import Dropout
 import warnings
 warnings.filterwarnings("ignore")
+
+def run_sequence_plot(x, y, title='', xlabel="time", ylabel="series"):
+    plt.plot(x, y, 'b-')
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.grid(alpha=0.3)
+    plt.show();    
 
 df = pd.read_csv('~/time-series-1/Data/AirPassengers.csv')
 print(df.info())
@@ -44,7 +53,7 @@ df.head()
 # After a little effortless data preprocessing, plotting the time series data is  
 # our first step to begin any time series data analysis.
 
-df.plot()
+run_sequence_plot(df.index.values, df.AirPassengers, title="Air Passengers")
 
 # Two major observations: (1) the time series data is trending upward and (2)  
 # the amplitude of the variation is getting large over time. 
@@ -57,7 +66,9 @@ df.plot()
 
 train, test = df[:-12], df[-12:]
 
-# As you can see, we perform one of the most important transformations we need  
+# # Feature Scaling
+
+# As you will see, we perform one of the most important transformations we need  
 # to our data: feature scaling. 
 
 # Machine learning algorithms don't perform well when the input numerical  
@@ -75,20 +86,35 @@ test = scaler.transform(test)
 # dataset (including the test set). Only then can we use them to transform the  
 # training set and the test set (and new data).
 
+# # Sampling for Supervised TS Prediction
+
 n_input = 12
 n_features = 1
 generator = TimeseriesGenerator(train, train, length=n_input, batch_size=6)
 
-# length: # of lag observations to use in the input portion of each sample  
-# batch_size: # of samples to return on each iteration  
+# `length`: the number of lagging time steps from the 1st argument.  
+# `batch_size`: the number of looking forward time steps from the 2nd argument.
 
-# Suppose we have a univariate data [1,2,3,4,5]. If `length=2` and `batch_size=3`,  
-# then x1 = [1,2], and y1 = [[2,3],[3,4],[4,5]].
+# ## Cases of Time Series Sampling
+
+# To have a concrete idea of what `length` and `batch_size` stand for, experiment  
+# the following .py files from Jason Brownlee's [website](https://machinelearningmastery.com/how-to-use-the-timeseriesgenerator-for-time-series-forecasting-in-keras/):
+# - *multivariate-one-step-TimeSeriesGenerator.py*: Splitting a typical  
+# multivariate time series with a univariate series.  
+# - *multistep-forecasts.py*: multivariate input with multivariate output.  
+# - *multivariate-input-and-dependent-I.py*: A case where input data at time  
+# `t` is mapped to output data at the same time `t` (i.e., neither of the series  
+# are time series data). 
+# - *multivariate-input-and-dependent-II.py*: Similar to the above except for  
+# using `insert` along with `TimeSeriesGenerator` to form the batch series for  
+# convenience.
 
 # Reference: 
 # - [How to use the TimeseriesGenerator](https://machinelearningmastery.com/how-to-use-the-timeseriesgenerator-for-time-series-forecasting-in-keras/)  
 #   Check `univariate-one-step-TimeSeriesGenerator.py` for instance.   
 # - [Difference between a batch and an epoch](https://machinelearningmastery.com/difference-between-a-batch-and-an-epoch/)
+
+# # Forming LSTM Layer
 
 model = Sequential()
 model.add(LSTM(200, activation='relu', input_shape=(n_input, n_features)))
@@ -97,39 +123,58 @@ model.add(Dense(1)) # a dense layer making the prediction
 model.compile(optimizer='adam', loss='mse')
 
 # LSTM expects data input to have the shape in the following format:  
-# `[batch, timesteps, features]`. The first argument is # of neurons. 
+# `[batch, timesteps, features]`, where:  
+# - *batch*: number of neurons
+# - *timesteps*: number of lags
+# - *features*: number of series (i.e., dimension of output series data), for  
+# instance, the value is one for a univariate time series.
 
-# `batch`: # of samples.  
-# `timesteps`: # of lags plus one (one represents for the current value)  
-# `features`: One for an univariate series
-
-# Suppose a univariate time series [1,2,3,4,5,6] is splitted into  
-# [x1,y1] = [[1,2,3,4],[5]] and [x2,y2] = [[2,3,4,5],[6]]. Then,  
-# In this example, we have `[batch, timesteps, features]=[2,4,1]`.
-
-# Check `univariate-one-step-with-LSTM.py` for instance.
+# Suppose a univariate time series [1,2,3,4,5,6,7] is splitted into  
+# t1 = [x1,y1] = [[1,2,3,4],[5]], t2 = [x2,y2] = [[2,3,4,5],[6]], and  
+# t3 = [x3,y3] = [[3,4,5,6],[7]].
+# In this example, we have `[timesteps, features]=[4,1]`.   
 
 # Note: If we want to create a multiple-layer-perceptron model, then we can  
 # simplify the LSTM model by substituting the LSTM line with the following code:  
-# `model.add(Dense(100, activation='relu', input_dim=n_input)),` for example.
+# `model.add(Dense(100, activation='relu', input_dim=n_input)),` for example.  
 
+# Check `univariate-one-step-with-LSTM.py` for instance.
 
+# Timing the training
+start_time = time.time()
 model.fit_generator(generator,epochs=90)
+print('Generator fitting took {} seconds'.format(time.time()-start_time))
 
 # +
 pred_list = []
-
+# Make a prediction on the last window of size `n_input`.
 batch = train[-n_input:].reshape((1, n_input, n_features))
+
+# -
+
+# How do we figure our what the parameters represent for?  
+# Back to our univariate time series [1,2,...,7].  
+# If we plan to make a prediction based on two latest samples, t2 and t3, then  
+# the combination of arguments [batch, timesteps, features] should be [2,4,1].  
+# In the code here, the prediction is based off the last window, so the  
+# combination of parameters is [1, 12, 1] where 12 is the value of `n_input`.  
+
+# Next, make a new prediction and then shift forward the window by one timestep for  
+# every iteration. In the end of each iteration, we update the batch variable  
+# so that the newly obtained scalar is the latest datapoint of the window.
+
+# +
 
 for i in range(n_input):   
     pred_list.append(model.predict(batch)[0]) 
     batch = np.append(batch[:,1:,:],[[pred_list[i]]],axis=1)
 
-# +
+# Scaling back our prediction to the original scale.
 df_predict = pd.DataFrame(scaler.inverse_transform(pred_list),
                           index=df[-n_input:].index, columns=['Prediction'])
 
 df_test = pd.concat([df,df_predict], axis=1)
+
 # -
 
 plt.figure(figsize=(20, 5))
@@ -140,11 +185,16 @@ plt.xticks(fontsize=18)
 plt.yticks(fontsize=16)
 plt.show()
 
+# Measuring the Error
 pred_actual_rmse = rmse(df_test.iloc[-n_input:, [0]], df_test.iloc[-n_input:, [1]])
 print("rmse: ", pred_actual_rmse)
 
-train = df
+# Suppose the model outperforms other predictive models. Then we would retrain  
+# the model on the full training data before make new predictions in the  
+# production phase. 
 
+# + 
+train = df
 scaler.fit(train)
 train = scaler.transform(train)
 
@@ -152,7 +202,14 @@ n_input = 12
 n_features = 1
 generator = TimeseriesGenerator(train, train, length=n_input, batch_size=6)
 
+start_time = time.time()
 model.fit_generator(generator,epochs=90)
+print('Generator fitting took {} seconds'.format(time.time()-start_time))
+
+# -
+
+# Reference:
+# - [The relation between `step_per_epoch` and `batch_size`](https://datascience.stackexchange.com/questions/47405/what-to-set-in-steps-per-epoch-in-keras-fit-generator#content)  
 
 # +
 pred_list = []
@@ -164,13 +221,18 @@ for i in range(n_input):
     batch = np.append(batch[:,1:,:],[[pred_list[i]]],axis=1)
 # -
 
-# +
+# Since we are going to make a prediction beyond the training data, we create  
+# a index column for the new datetime series.
+
+from pandas.tseries.offsets import DateOffset
+add_dates = [df.index[-1] + DateOffset(months=x) for x in range(0,13) ]
+future_dates = pd.DataFrame(index=add_dates[1:],columns=df.columns)
 df_predict = pd.DataFrame(scaler.inverse_transform(pred_list),
-                          index=future_dates[-n_input:].index, columns=['Prediction'])
+                          index=future_dates[-n_input:].index, 
+                          columns=['Prediction'])
 
+# Plot the multistep prediction.                        
 df_proj = pd.concat([df,df_predict], axis=1)
-# -
-
 plt.figure(figsize=(20, 5))
 plt.plot(df_proj.index, df_proj['AirPassengers'])
 plt.plot(df_proj.index, df_proj['Prediction'], color='r')
@@ -179,16 +241,9 @@ plt.xticks(fontsize=18)
 plt.yticks(fontsize=16)
 plt.show()
 
-# For a more compplicated case in splitting multivariate time series, see   
-# `multivariate-one-step-TimeSeriesGenerator.py` and  
-# `multivariate-one-step-with-LSTM.py` for example. 
-
-# `multivariate-input-and-dependent-I.py`  
-# `multivariate-input-and-dependent-II.py`  
-# `multistep-forecasts.py`  
+# See *multivariate-one-step-with-LSTM.py* for predicting multivariate time series.
 
 # # Reference
 
-
-
-
+# [1] [A Quick Example of Time-Series Prediction Using Long Short-Term Memory (LSTM) Networks](https://medium.com/swlh/a-quick-example-of-time-series-forecasting-using-long-short-term-memory-lstm-networks-ddc10dc1467d) by Ian Felton  
+# [2] [How to Use the TimeseriesGenerator for Time Series Forecasting in Keras](https://machinelearningmastery.com/how-to-use-the-timeseriesgenerator-for-time-series-forecasting-in-keras/) by Jason Brownless

@@ -17,7 +17,9 @@ dataset = hstack((in_seq1, in_seq2))
 out_seq = insert(out_seq, 0, 0)
 # define generator
 n_input = 1
-generator = TimeseriesGenerator(dataset, out_seq, length=n_input, batch_size=1)
+generator = TimeseriesGenerator(dataset, out_seq[1:], 
+                                length=n_input, 
+								batch_size=1)
 # print each sample
 for i in range(len(generator)):
 	x, y = generator[i]

@@ -14,7 +14,7 @@ in_seq2 = in_seq2.reshape((len(in_seq2), 1))
 # horizontally stack columns
 dataset = hstack((in_seq1, in_seq2))
 # define generator
-n_features = dataset.shape[1]
+n_features = dataset.shape[1] # 2, we have two entries every time step.
 n_input = 2
 generator = TimeseriesGenerator(dataset, dataset, length=n_input, batch_size=8)
 # define model
@@ -23,8 +23,18 @@ model.add(LSTM(100, activation='relu', input_shape=(n_input, n_features)))
 model.add(Dense(2))
 model.compile(optimizer='adam', loss='mse')
 # fit model
+import time
+start_time = time.time()
 model.fit_generator(generator, steps_per_epoch=1, epochs=500, verbose=0)
+print('the training time took {} seconds'.format(time.time()-start_time))
 # make a one step prediction out of sample
 x_input = array([[90, 95], [100, 105]]).reshape((1, n_input, n_features))
 yhat = model.predict(x_input, verbose=0)
 print(yhat)
+
+# Result:
+# yhat = array([[110.074104, 115.53377 ]], dtype=float32)
+#
+# Note:                  
+# x_input = array([[[ 90,  95],
+#                   [100, 105]]])
