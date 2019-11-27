@@ -98,7 +98,7 @@ model.compile(optimizer='adam', loss='mse')
 
 # LSTM expects data input to have the shape in the following format:  
 # `[batch, timesteps, features]`.  
- 
+
 # `batch`: # of samples.  
 # `timesteps`: # of lags plus one (one represents for the current value)  
 # `features`: One for an univariate series
