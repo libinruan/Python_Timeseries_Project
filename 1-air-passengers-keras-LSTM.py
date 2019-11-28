@@ -138,19 +138,22 @@ model.compile(optimizer='adam', loss='mse')
 # simplify the LSTM model by substituting the LSTM line with the following code:  
 # `model.add(Dense(100, activation='relu', input_dim=n_input)),` for example.  
 
-# Check `univariate-one-step-with-LSTM.py` for instance.
+
+# Check `univariate-one-step-with-LSTM.py` for the LSTM application on time  
+# series prediction.
+
+# Reference:  
+# - [Use of return_sequence and TimeDistributed()](https://stackoverflow.com/questions/42755820/how-to-use-return-sequences-option-and-timedistributed-layer-in-keras#answer-42758532)  
 
 # Timing the training
 start_time = time.time()
 model.fit_generator(generator,epochs=90)
 print('Generator fitting took {} seconds'.format(time.time()-start_time))
 
-# +
 pred_list = []
 # Make a prediction on the last window of size `n_input`.
 batch = train[-n_input:].reshape((1, n_input, n_features))
 
-# -
 
 # How do we figure our what the parameters represent for?  
 # Back to our univariate time series [1,2,...,7].  
@@ -193,7 +196,7 @@ print("rmse: ", pred_actual_rmse)
 # the model on the full training data before make new predictions in the  
 # production phase. 
 
-# + 
+# +
 train = df
 scaler.fit(train)
 train = scaler.transform(train)
